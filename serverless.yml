@@ -1,0 +1,81 @@
+service: sns-sqs-pubsub-example
+
+plugins:
+  - serverless-pseudo-parameters
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  topicName: '${self:custom.stage}-sample-sns-topic'
+  queueName: '${self:custom.stage}-sample-sqs-queue'
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  environment:
+    TOPIC_NAME: ${self:custom.topicName}
+    QUEUE_NAME: ${self:custom.queueName}
+    accountId: '#{AWS::AccountId}'
+    region: '#{AWS::Region}'
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - sns:Publish
+      Resource: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
+    - Effect: Allow
+      Action:
+        - sqs:SendMessage
+        - sqs:DeleteMessage
+        - sqs:ReceiveMessage
+      Resource: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
+
+functions:
+  eventPublisher:
+    handler: handler.eventPublisher
+    events:
+      - http:
+          path: trigger
+          method: get
+          cors: true
+
+  eventConsumerSQS:
+    handler: handler.eventConsumerSQS
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [CustomQueue, Arn]
+
+resources:
+  Resources:
+    CustomTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:custom.topicName}
+        Subscription:
+          - Protocol: sqs
+            Endpoint:
+              Fn::GetAtt: [CustomQueue, Arn]
+
+    CustomQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.queueName}
+
+    QueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - Ref: CustomQueue
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            Sid: Allow-SendMessage-To-${self:custom.queueName}-From-${self:custom.topicName}
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - sqs:SendMessage
+            Resource: '*'
+            Condition:
+              ArnEquals:
+                'aws:SourceArn':
+                  Ref: CustomTopic
+
