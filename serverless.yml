@@ -42,6 +42,13 @@ functions:
           method: get
           cors: true
 
+  eventConsumerSNS:
+    # 4. if needed change the event consumer handler name
+    handler: eventConsumerSNS.eventConsumerSNS
+    events:
+      - sns:
+          arn: ${self:custom.topicArn}
+
   eventConsumerSQS:
     # 4. if needed change the event consumer handler name
     handler: eventConsumerSQS.eventConsumerSQS

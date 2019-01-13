@@ -1,5 +1,5 @@
 # SNS - SQS - PubSub Example  
-This repo contains an example of how to publish sns message from a lambda and consume the message via other lambda which is registered to sqs queue.
+This repo contains an example of how to publish sns message from a lambda and consume the message via other lambdas which are registered to sns topic or sqs queue.
 
 It took me some time to figure out how to create the subscription between a SNS message and SQS queue and write the serverless.yml which allows servereless framework to install it
 
@@ -29,6 +29,10 @@ resource "aws_sns_topic" "dev-sample-sns-topic" {
 sls deploy
 `
 - Following successful deployment serverless framework will show you an endpoint to the event producer, click on the endpoint in order to generate a message to sns.
+- Watch the logs on the sns event consumer using 
+`
+sls logs -f eventConsumerSNS
+`
 - Watch the logs on the sqs event consumer using 
 `
 sls logs -f eventConsumerSQS
