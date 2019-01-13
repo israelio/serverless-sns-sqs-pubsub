@@ -50,7 +50,7 @@ functions:
           arn: ${self:custom.topicArn}
 
   eventConsumerSQS:
-    # 4. if needed change the event consumer handler name
+    # 5. if needed change the event consumer handler name
     handler: eventConsumerSQS.eventConsumerSQS
     events:
       - sqs: ${self:custom.queueArn}
