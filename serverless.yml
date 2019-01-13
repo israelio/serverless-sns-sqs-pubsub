@@ -7,7 +7,8 @@ custom:
   stage: ${opt:stage, self:provider.stage}
   topicName: '${self:custom.stage}-sample-sns-topic'
   queueName: '${self:custom.stage}-sample-sqs-queue'
-
+  topicArn: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
+  queueArn: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
 provider:
   name: aws
   runtime: nodejs8.10
@@ -20,17 +21,17 @@ provider:
     - Effect: Allow
       Action:
         - sns:Publish
-      Resource: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
+      Resource: ${self:custom.topicArn}
     - Effect: Allow
       Action:
         - sqs:SendMessage
         - sqs:DeleteMessage
         - sqs:ReceiveMessage
-      Resource: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
+      Resource: ${self:custom.queueArn}
 
 functions:
-  eventPublisher:
-    handler: handler.eventPublisher
+  eventPublisherSNS:
+    handler: eventPublisherSNS.eventPublisherSNS
     events:
       - http:
           path: trigger
@@ -38,44 +39,38 @@ functions:
           cors: true
 
   eventConsumerSQS:
-    handler: handler.eventConsumerSQS
+    handler: eventConsumerSQS.eventConsumerSQS
     events:
-      - sqs:
-          arn:
-            Fn::GetAtt: [CustomQueue, Arn]
+      - sqs: ${self:custom.queueArn}
 
 resources:
   Resources:
-    CustomTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        TopicName: ${self:custom.topicName}
-        Subscription:
-          - Protocol: sqs
-            Endpoint:
-              Fn::GetAtt: [CustomQueue, Arn]
-
     CustomQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:custom.queueName}
 
-    QueuePolicy:
-      Type: AWS::SQS::QueuePolicy
+    CustomQueueSubscription:
+      Type: AWS::SNS::Subscription
       Properties:
-        Queues:
-          - Ref: CustomQueue
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            Sid: Allow-SendMessage-To-${self:custom.queueName}-From-${self:custom.topicName}
-            Effect: Allow
-            Principal: '*'
-            Action:
-              - sqs:SendMessage
-            Resource: '*'
-            Condition:
-              ArnEquals:
-                'aws:SourceArn':
-                  Ref: CustomTopic
+        Protocol: sqs
+        Endpoint: ${self:custom.queueArn}
+        TopicArn: ${self:custom.topicArn}
 
+    CustomQueuePolicy:
+       Type: AWS::SQS::QueuePolicy
+       Properties:
+         Queues:
+           - Ref: CustomQueue
+         PolicyDocument:
+           Version: '2012-10-17'
+           Statement:
+             Sid: Allow-SendMessage-To-${self:custom.queueName}-From-${self:custom.topicName}
+             Effect: Allow
+             Principal: '*'
+             Action:
+               - sqs:SendMessage
+             Resource: '*'
+             Condition:
+                ArnEquals:
+                  'aws:SourceArn':  ${self:custom.topicArn}

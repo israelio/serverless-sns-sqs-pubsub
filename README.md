@@ -8,6 +8,22 @@ This example shows the basics of fan out using messaging pattern such as PubSub 
 ## Running instructions
 
 - Clone the repo
+- Add the serverless-pseudo-parameters plugin
+`
+npm install serverless-pseudo-parameters
+`
+- Create a SNS topic as we assume that this topic will be used by several consumers so it should be declared externally
+```
+# example of main.tf to create the topic using terraform
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_sns_topic" "dev-sample-sns-topic" {
+  name = "dev-sample-sns-topic"
+}
+```
 - Deploy the lambda to your aws account using
 `
 sls deploy
