@@ -5,7 +5,9 @@ plugins:
 
 custom:
   stage: ${opt:stage, self:provider.stage}
+  # 1. Declare what is the name of the topic to publish
   topicName: '${self:custom.stage}-sample-sns-topic'
+  # 2. Declare what is the name of the queue to create for the event consumer
   queueName: '${self:custom.stage}-sample-sqs-queue'
   topicArn: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
   queueArn: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
@@ -13,6 +15,7 @@ provider:
   name: aws
   runtime: nodejs8.10
   environment:
+    # you can use TOPIC_NAME and QUEUE_NAME env variables in your lambda to send messages via code
     TOPIC_NAME: ${self:custom.topicName}
     QUEUE_NAME: ${self:custom.queueName}
     accountId: '#{AWS::AccountId}'
@@ -31,6 +34,7 @@ provider:
 
 functions:
   eventPublisherSNS:
+    # 3. if needed change the event publisher handler name and how it is triggered
     handler: eventPublisherSNS.eventPublisherSNS
     events:
       - http:
@@ -39,6 +43,7 @@ functions:
           cors: true
 
   eventConsumerSQS:
+    # 4. if needed change the event consumer handler name
     handler: eventConsumerSQS.eventConsumerSQS
     events:
       - sqs: ${self:custom.queueArn}
