@@ -7,4 +7,7 @@ module.exports.eventConsumerSQS = (event, context, callback) => {
   return callback(null, {
     event: event
   });
+
+  // Uncomment the following line to see the message flow the the Dead Letter Queue
+  // throw Error('Some error message');
 };

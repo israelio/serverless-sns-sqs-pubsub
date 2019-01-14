@@ -5,17 +5,26 @@ plugins:
 
 custom:
   stage: ${opt:stage, self:provider.stage}
+
+  #
   # 1. Declare what is the name of the topic to publish
+  #
   topicName: '${self:custom.stage}-sample-sns-topic'
+  #
   # 2. Declare what is the name of the queue to create for the event consumer
+  #
   queueName: '${self:custom.stage}-sample-sqs-queue'
+
   topicArn: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
   queueArn: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
+
 provider:
   name: aws
   runtime: nodejs8.10
   environment:
+    #
     # you can use TOPIC_NAME and QUEUE_NAME env variables in your lambda to send messages via code
+    #
     TOPIC_NAME: ${self:custom.topicName}
     QUEUE_NAME: ${self:custom.queueName}
     accountId: '#{AWS::AccountId}'
@@ -34,7 +43,9 @@ provider:
 
 functions:
   eventPublisherSNS:
+    #
     # 3. if needed change the event publisher handler name and how it is triggered
+    #
     handler: eventPublisherSNS.eventPublisherSNS
     events:
       - http:
@@ -43,14 +54,18 @@ functions:
           cors: true
 
   eventConsumerSNS:
+    #
     # 4. if needed change the event consumer handler name
+    #
     handler: eventConsumerSNS.eventConsumerSNS
     events:
       - sns:
           arn: ${self:custom.topicArn}
 
   eventConsumerSQS:
+    #
     # 5. if needed change the event consumer handler name
+    #
     handler: eventConsumerSQS.eventConsumerSQS
     events:
       - sqs: ${self:custom.queueArn}
@@ -61,6 +76,41 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:custom.queueName}
+        #
+        # The length of time, in seconds, for which Amazon SQS retains a message.
+        # Valid values: An integer representing seconds, from 60 (1 minute) to 1,209,600 (14 days).
+        # Default: 345,600 (4 days).
+        #
+        MessageRetentionPeriod: '1209600'
+        #
+        # The visibility timeout for the queue, in seconds.
+        # Valid values: an integer from 0 to 43,200 (12 hours).
+        # Default: 30.
+        #
+        VisibilityTimeout: '60'
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - CustomQDeadLetterQueue
+              - Arn
+          #
+          # The number of times a message is delivered to the source queue before being moved to the dead-letter queue.
+          # When the ReceiveCount for a message exceeds the maxReceiveCount for a queue,
+          # Amazon SQS moves the message to the dead-letter-queue.
+          #
+          maxReceiveCount: '10'
+      DependsOn: CustomQDeadLetterQueue
+
+    CustomQDeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.queueName}-DLQ
+        #
+        # The length of time, in seconds, for which Amazon SQS retains a message.
+        # Valid values: An integer representing seconds, from 60 (1 minute) to 1,209,600 (14 days).
+        # Default: 345,600 (4 days).
+        #
+        MessageRetentionPeriod: '1209600'
 
     CustomQueueSubscription:
       Type: AWS::SNS::Subscription
@@ -68,6 +118,8 @@ resources:
         Protocol: sqs
         Endpoint: ${self:custom.queueArn}
         TopicArn: ${self:custom.topicArn}
+        RawMessageDelivery: true
+      DependsOn: CustomQueue
 
     CustomQueuePolicy:
        Type: AWS::SQS::QueuePolicy
@@ -86,3 +138,22 @@ resources:
              Condition:
                 ArnEquals:
                   'aws:SourceArn':  ${self:custom.topicArn}
+       DependsOn: CustomQueue
+
+#    QueueDepthAlarmOver10:
+#      Type: AWS::CloudWatch::Alarm
+#      Properties:
+#        AlarmDescription: Queue depth grow beyond 10 messages
+#        Namespace: AWS/SQS
+#        MetricName: NumberOfMessagesVisible
+#        Dimensions:
+#          - Name: QueueName
+#            Value: ${self:custom.queueName}
+#        Statistic: Sum
+#        Period: '60'
+#        EvaluationPeriods: '1'
+#        Threshold: '1'
+#            Threshold: '10'
+#        ComparisonOperator: GreaterThanOrEqualToThreshold
+#        AlarmActions:
+#          - arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}-Alarm
