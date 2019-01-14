@@ -67,8 +67,28 @@ functions:
     # 5. if needed change the event consumer handler name
     #
     handler: eventConsumerSQS.eventConsumerSQS
+    #
+    # set concurrency control with the reservedConcurrency property on a particular function.
+    # limit our function to no more than 10 concurrent invocation
+    #
+    reservedConcurrency: 10
     events:
       - sqs: ${self:custom.queueArn}
+        #
+        # how many SQS messages will be included in a single Lambda invocation.
+        # The default batchSize is 10, and the max batchSize is 10.
+        #
+        # With the SQS / Lambda integration, a batch of messages succeeds or fails together.
+        # Assuming that batchSize set to 10 messages, which is the default,
+        # If your function is invoked with 10 messages, and your function returns an error while
+        # processing the 7th message, all 10 messages will remain in the queue to be processed by a
+        # different Lambda function.
+        # AWS will only delete the messages from the queue if your function returned successfully without any errors.
+        #
+        # Setting to 1 messages succeed or fail on their own.
+        #
+        batchSize: 1
+        enabled: true
 
 resources:
   Resources:
@@ -91,7 +111,7 @@ resources:
         RedrivePolicy:
           deadLetterTargetArn:
             Fn::GetAtt:
-              - CustomQDeadLetterQueue
+              - DeadLetterQueue
               - Arn
           #
           # The number of times a message is delivered to the source queue before being moved to the dead-letter queue.
@@ -99,9 +119,9 @@ resources:
           # Amazon SQS moves the message to the dead-letter-queue.
           #
           maxReceiveCount: '10'
-      DependsOn: CustomQDeadLetterQueue
+      DependsOn: DeadLetterQueue
 
-    CustomQDeadLetterQueue:
+    DeadLetterQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:custom.queueName}-DLQ
@@ -112,7 +132,7 @@ resources:
         #
         MessageRetentionPeriod: '1209600'
 
-    CustomQueueSubscription:
+    QueueSubscription:
       Type: AWS::SNS::Subscription
       Properties:
         Protocol: sqs
@@ -121,7 +141,7 @@ resources:
         RawMessageDelivery: true
       DependsOn: CustomQueue
 
-    CustomQueuePolicy:
+    QueuePolicy:
        Type: AWS::SQS::QueuePolicy
        Properties:
          Queues:
