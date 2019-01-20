@@ -9,11 +9,12 @@ custom:
   #
   # 1. Declare what is the name of the topic to publish
   #
-  topicName: '${self:custom.stage}-sample-sns-topic'
+  #topicName: '${self:custom.stage}-event-customer-created'
+  topicName: 'test-event-customer'
   #
   # 2. Declare what is the name of the queue to create for the event consumer
   #
-  queueName: '${self:custom.stage}-sample-sqs-queue'
+  queueName: '${self:custom.stage}-handle-customer-hubspot'
 
   topicArn: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.topicName}
   queueArn: arn:aws:sqs:#{AWS::Region}:#{AWS::AccountId}:${self:custom.queueName}
@@ -132,12 +133,20 @@ resources:
         #
         MessageRetentionPeriod: '1209600'
 
+    #
+    # filtering logic
+    # https://docs.aws.amazon.com/sns/latest/dg/sns-message-filtering.html#message-filtering-example-policy
+    #
     QueueSubscription:
       Type: AWS::SNS::Subscription
       Properties:
         Protocol: sqs
         Endpoint: ${self:custom.queueArn}
         TopicArn: ${self:custom.topicArn}
+        FilterPolicy:
+          event_type:
+            - 'created'
+            - 'deleted'
         RawMessageDelivery: true
       DependsOn: CustomQueue
 
